@@ -1,0 +1,48 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+
+# --- JetBrains (IntelliJ/PyCharm) ---
+.idea/
+*.iml
+*.iws
+out/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv/
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# --- YOLOv11 / Ultralytics Training ---
+# Ignore training results and weights
+runs/
+*.pt
+*.onnx
+*.engine
+*.pb
+*.tflite
+
+# Ignore local datasets (if stored in project)
+datasets/
+data/*.zip
+data/*.tar.gz
+
+# --- Logs and Cache ---
+*.log
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
