@@ -14,7 +14,7 @@
   
   
   yolo detect val ^
-  model=runs/detect/runs/yolo11/drone_finetune_subset3k4/weights/Final_drone.pt ^
+  model=runs/detect/yolo11/drone_finetune_subset3k4/weights/Final_drone.pt ^
   data=datasets/drone_mixed_rgb.yaml ^
   split=test ^
   device=0
@@ -37,9 +37,35 @@ yolo detect predict ^
 
 
 yolo detect predict ^
-  model=runs/detect/runs/yolo11/drone_finetune_subset3k4/weights/best.pt ^
+  model=runs/detect/yolo11/drone_finetune_subset3k4/weights/best.pt ^
   source=E:\Dataset\wosdetc_train_videos\2019_11_14_C0001_3922_matrice.mp4 ^
   device=0 ^
   conf=0.25 ^
   save=False ^
   show=True
+
+ python random_image_selector.py `
+>>   --src "E:\Dataset\Suppress False Positive\UA-DETRAC" `
+>>   --out "E:\Dataset\Suppress False Positive\Mixed10k" `
+>>   --dataset "UA-DETRAC" `
+>>   --n 3333 `
+>>   --seed 1337
+
+
+yolo detect train ^
+model=weights/Final_drone.pt ^
+data=datasets/drone_mixed.yaml ^
+epochs=75 ^
+imgsz=640 ^
+batch=48 ^ 
+workers=6 ^
+optimizer=AdamW ^
+lr0=0.001 ^
+device=0 ^
+amp=True ^
+verbose=False ^
+save=True ^
+save_period=10 ^
+plots=True ^
+project=yolo11 ^
+name=drone_finetune_full_mixed
