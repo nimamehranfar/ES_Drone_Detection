@@ -29,7 +29,14 @@ dist/
 
 # --- YOLOv11 / Ultralytics Training ---
 # Ignore training results and weights
-runs/
+runs/detect/*
+
+# 2. Allow the yolo11 folder
+!runs/detect/yolo11/
+
+# 3. Allow everything INSIDE the yolo11 folder (overrides the *.pt rule below)
+!runs/yolo11/**
+
 *.pt
 *.onnx
 *.engine
