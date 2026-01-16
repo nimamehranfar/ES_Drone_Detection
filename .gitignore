@@ -28,7 +28,7 @@ dist/
 *.egg-info/
 
 # --- YOLOv11 / Ultralytics Training ---
-# Ignore training results and weights
+# Ignore training results and pretrained_weights
 runs/detect/*
 
 # 2. Allow the yolo11 folder

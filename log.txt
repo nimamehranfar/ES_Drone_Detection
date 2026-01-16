@@ -1,8 +1,8 @@
 50 epochs completed in 0.283 hours.
-Optimizer stripped from S:\IntelliJ\Projects\ES_Drone_Detection\runs\detect\runs\yolo11\drone_finetune_subset3k4\weights\last.pt, 5.5MB
-Optimizer stripped from S:\IntelliJ\Projects\ES_Drone_Detection\runs\detect\runs\yolo11\drone_finetune_subset3k4\weights\best.pt, 5.5MB
+Optimizer stripped from S:\IntelliJ\Projects\ES_Drone_Detection\runs\detect\runs\yolo11\drone_finetune_subset3k4\pretrained_weights\last.pt, 5.5MB
+Optimizer stripped from S:\IntelliJ\Projects\ES_Drone_Detection\runs\detect\runs\yolo11\drone_finetune_subset3k4\pretrained_weights\best.pt, 5.5MB
 
-Validating S:\IntelliJ\Projects\ES_Drone_Detection\runs\detect\runs\yolo11\drone_finetune_subset3k4\weights\best.pt...
+Validating S:\IntelliJ\Projects\ES_Drone_Detection\runs\detect\runs\yolo11\drone_finetune_subset3k4\pretrained_weights\best.pt...
 Ultralytics 8.3.251  Python-3.10.0 torch-2.5.1+cu121 CUDA:0 (NVIDIA GeForce RTX 4070 Laptop GPU, 8188MiB)
 YOLO11n summary (fused): 100 layers, 2,582,347 parameters, 0 gradients, 6.3 GFLOPs
                  Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 25% ━━━───────── 1/4 1.3s/it 0                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 50% ━━━━━━────── 2/4 1.1it/s 1                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 75% ━━━━━━━━━─── 3/4 1.2it/s 1                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 4/4 2.1it/s                  Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 4/4 2.1it/s 1.9s
@@ -13,7 +13,7 @@ Results saved to S:\IntelliJ\Projects\ES_Drone_Detection\runs\detect\runs\yolo11
  
  
 (.venv) S:\IntelliJ\Projects\ES_Drone_Detection>  yolo detect val ^
-More?   model=runs/detect/runs/yolo11/drone_finetune_subset3k4/weights/best.pt ^
+More?   model=runs/detect/runs/yolo11/drone_finetune_subset3k4/pretrained_weights/best.pt ^
 More?   data=datasets/drone_mixed_rgb.yaml ^
 More?   split=test ^
 More?   device=0
@@ -27,3 +27,22 @@ val: New cache created: E:\Dataset\YOLOv11_subset_3k_801010\labels\test.cache
 Speed: 0.9ms preprocess, 2.8ms inference, 0.0ms loss, 0.5ms postprocess per image
 Results saved to S:\IntelliJ\Projects\ES_Drone_Detection\runs\detect\val
  Learn more at https://docs.ultralytics.com/modes/val
+
+
+yolo detect val ^
+ model=pretrained_weights\yolo11n.pt ^
+ data=datasets\drone_mixed.yaml ^
+ split=test ^
+ device=0
+                  Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 692/692 15.2it/s 45.4s
+                   all      11062      10051     0.0247      0.261     0.0165    0.00806
+                person       9558      10051     0.0247      0.261     0.0165    0.00806
+
+
+yolo detect val ^
+ model=pretrained_weights\Final_drone.pt ^
+ data=datasets\drone_mixed.yaml ^
+ split=test ^
+ device=0
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 692/692 14.1                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 692/692 14.1it/s 49.0s
+                   all      11062      10051      0.539      0.354      0.349      0.112
