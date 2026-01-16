@@ -160,7 +160,7 @@ def process_one_session(txt_path: Path, video_path: Path, every_n: int, drone_on
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--every-n", type=int, default=5, help="Save 1 frame every N frames (default: 5)")
+    ap.add_argument("--every-n", type=int, default=2, help="Save 1 frame every N frames (default: 5)")
     ap.add_argument("--drone-only", action="store_true", help="If set, ignore 'bird' annotations and keep only drones")
     args = ap.parse_args()
 

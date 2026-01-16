@@ -24,8 +24,8 @@ RANDOM_SEED = 42
 # ==============================
 
 DATASETS = {
-    "anti_uav": SRC_ROOT / "anti_uav_rgbt_rgb",
-    "dut": SRC_ROOT / "dut_anti_uav_det",
+    # "anti_uav": SRC_ROOT / "anti_uav_rgbt_rgb",
+    # "dut": SRC_ROOT / "dut_anti_uav_det",
     "wosdetc": SRC_ROOT / "wosdetc_train",
 }
 
@@ -45,15 +45,16 @@ def collect_pairs(dataset_name: str, root: Path):
     pairs = []
 
     # ---- mixed flat mode ----
-    img_root_flat = root / "Images"
-    lbl_root_flat = root / "Labels"
+    # img_root_flat = root / "Images"
+    # lbl_root_flat = root / "Labels"
+    #
+    # if img_root_flat.exists() and lbl_root_flat.exists():
+    #     for img_path in img_root_flat.glob("*.jpg"):
+    #         lbl_path = lbl_root_flat / f"{img_path.stem}.txt"
+    #         if lbl_path.exists():
+    #             pairs.append((dataset_name, img_path, lbl_path))
+    #     return pairs
 
-    if img_root_flat.exists() and lbl_root_flat.exists():
-        for img_path in img_root_flat.glob("*.jpg"):
-            lbl_path = lbl_root_flat / f"{img_path.stem}.txt"
-            if lbl_path.exists():
-                pairs.append((dataset_name, img_path, lbl_path))
-        return pairs
 
     # ---- split-based mode (original behavior) ----
     img_root = root / "images"
@@ -112,8 +113,8 @@ def main():
         DATASETS = {"mixed": SRC_ROOT}
     else:
         DATASETS = {
-            "anti_uav": SRC_ROOT / "anti_uav_rgbt_rgb",
-            "dut": SRC_ROOT / "dut_anti_uav_det",
+            # "anti_uav": SRC_ROOT / "anti_uav_rgbt_rgb",
+            # "dut": SRC_ROOT / "dut_anti_uav_det",
             "wosdetc": SRC_ROOT / "wosdetc_train",
         }
 
