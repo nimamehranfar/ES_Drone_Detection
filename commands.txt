@@ -72,3 +72,30 @@ name=drone_finetune_full_mixed
 
 
 yolo detect train model=pretrained_weights/Final_drone.pt data=datasets/drone_mixed.yaml epochs=60 imgsz=640 batch=48 workers=6 optimizer=AdamW lr0=0.001 cos_lr=True perspective=0.0003 erasing=0.25 patience=20 device=0 amp=True verbose=False save=True save_period=10 plots=True project=yolo11 name=drone_finetune_full_mixed
+
+
+yolo detect train ^
+model=yolo26n.pt ^
+data=datasets/drone_mixed.yaml ^
+epochs=100 ^
+imgsz=640 ^
+batch=48 ^
+workers=6 ^
+optimizer=AdamW ^
+lr0=0.001 ^
+device=0 ^
+amp=True ^
+verbose=False ^
+save=True ^
+save_period=10 ^
+plots=True ^
+project=yolo11 ^
+name=drone_finetune_full_mixed ^
+mosaic=0.5 ^
+close_mosaic=30
+
+
+yolo detect train model=yolo26n.pt data=datasets/drone_mixed.yaml epochs=70 imgsz=640 batch=48 workers=6 optimizer=AdamW lr0=0.001 device=0 amp=True verbose=False save=True save_period=10 plots=True project=yolo11 name=drone_finetune_full_mixed mosaic=0.33 close_mosaic=20
+
+
+yolo train resume=True model=yolo11/drone_finetune_full_mixed/weights/last.pt

@@ -40,9 +40,17 @@ yolo detect val ^
 
 
 yolo detect val ^
- model=pretrained_weights\Final_drone.pt ^
+ model=yolo26\drone_finetune_full_mixed\weights\best.pt ^
  data=datasets\drone_mixed.yaml ^
  split=test ^
  device=0
                  Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 692/692 14.1                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 692/692 14.1it/s 49.0s
                    all      11062      10051      0.539      0.354      0.349      0.112
+				   
+				   
+				   
+				                    Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 154/154 2.5it/s 1:02
+                   all      14757      13674      0.978      0.921      0.955      0.654
+Speed: 0.1ms preprocess, 0.9ms inference, 0.0ms loss, 0.2ms postprocess per image
+Results saved to S:\IntelliJ\Projects\ES_Drone_Detection\yolo11\drone_finetune_full_mixed
+ERROR Plotting error for S:\IntelliJ\Projects\ES_Drone_Detection\yolo11\drone_finetune_full_mixed\results.csv: local variable 'weights' referenced before assignment

@@ -1,2 +1,0 @@
-video,method,roi_mode,frames_processed,frames_scored,precision@0.5,recall@0.5,f1@0.5,out_video,frame_log_csv
-S:\IntelliJ\Projects\ES_Drone_Detection\video_test\GOPR5844_002.mp4,baseline,off,497,497,0.9401993355450492,0.6345291479806401,0.7576974560094479,video_benchmark_outputs\GOPR5844_002__baseline__roioff__20260116_140659.mp4,video_benchmark_outputs\GOPR5844_002__baseline__roioff__20260116_140659__frame_log.csv
