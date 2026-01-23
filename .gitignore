@@ -30,7 +30,6 @@ dist/
 # --- YOLOv11 / Ultralytics Training ---
 # Ignore training results and pretrained_weights
 runs/detect/*
-*.pt
 
 # 2. Allow the yolo11 folder
 !runs/detect/yolo11/
@@ -41,6 +40,7 @@ runs/detect/*
 !runs/yolo26/drone_finetune_full_mixed/**
 !runs/detect/yolo26/drone_finetune_full_mixed/weights/best.pt
 
+*.pt
 *.onnx
 *.engine
 *.pb
