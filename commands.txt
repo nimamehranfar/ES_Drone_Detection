@@ -15,13 +15,20 @@
   
   yolo detect val ^
   model=runs/detect/yolo11/drone_finetune_subset3k4/pretrained_weights/Final_drone.pt ^
-  data=datasets/drone_mixed_rgb.yaml ^
+  data=datasets/drone_mixed.yaml ^
   split=test ^
   device=0
   
   yolo detect val ^
   model=pretrained_weights/Final_drone.pt ^
-  data=datasets/drone_mixed_rgb.yaml ^
+  data=datasets/drone_mixed.yaml ^
+  split=test ^
+  device=0  
+  
+  
+  yolo detect val ^
+  model=runs/detect/yolo26/drone_finetune_full_mixed/weights/best.pt ^
+  data=datasets/drone_mixed.yaml ^
   split=test ^
   device=0
 
@@ -95,7 +102,17 @@ mosaic=0.5 ^
 close_mosaic=30
 
 
-yolo detect train model=yolo26n.pt data=datasets/drone_mixed.yaml epochs=70 imgsz=640 batch=48 workers=6 optimizer=AdamW lr0=0.001 device=0 amp=True verbose=False save=True save_period=10 plots=True project=yolo11 name=drone_finetune_full_mixed mosaic=0.33 close_mosaic=20
+yolo detect train model=yolo26n.pt data=datasets/drone_mixed.yaml epochs=100 imgsz=640 batch=144 workers=8 optimizer=AdamW lr0=0.003 device=0 amp=True save=True save_period=10 plots=True mosaic=0.4 close_mosaic=40
 
 
 yolo train resume=True model=yolo11/drone_finetune_full_mixed/weights/last.pt
+
+
+yolo detect val ^
+  model=runs/detect/train7/weights/best.pt ^
+  data=datasets/drone_mixed.yaml ^
+  split=test ^
+  device=0
+
+
+  python val.py --weights S:/IntelliJ/Projects/ES_Drone_Detection/pretrained_weights/FardadDadboud__Drone_YOLOv5_Detector.pt --data S:/IntelliJ/Projects/ES_Drone_Detection/datasets/drone_mixed.yaml --img 640 --conf 0.25 --iou 0.5 --task test

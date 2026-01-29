@@ -54,3 +54,11 @@ yolo detect val ^
 Speed: 0.1ms preprocess, 0.9ms inference, 0.0ms loss, 0.2ms postprocess per image
 Results saved to S:\IntelliJ\Projects\ES_Drone_Detection\yolo11\drone_finetune_full_mixed
 ERROR Plotting error for S:\IntelliJ\Projects\ES_Drone_Detection\yolo11\drone_finetune_full_mixed\results.csv: local variable 'weights' referenced before assignment
+
+
+
+yolo detect val ^
+ model=pretrained_weights\doguilmak__Drone-Detection-YOLOv11x.pt ^
+ data=datasets\drone_mixed.yaml ^
+ split=test ^
+ device=0
