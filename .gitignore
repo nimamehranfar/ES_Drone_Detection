@@ -53,6 +53,7 @@ data/*.tar.gz
 *.zip
 video_benchmark_outputs/
 video_test/
+yolov5/
 
 # --- Logs and Cache ---
 *.log

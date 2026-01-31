@@ -116,3 +116,10 @@ yolo detect val ^
 
 
   python val.py --weights S:/IntelliJ/Projects/ES_Drone_Detection/pretrained_weights/FardadDadboud__Drone_YOLOv5_Detector.pt --data S:/IntelliJ/Projects/ES_Drone_Detection/datasets/drone_mixed.yaml --img 640 --conf 0.25 --iou 0.5 --task test
+
+
+yolo detect val ^
+  model=pretrained_weights/doguilmak__Drone-Detection-YOLOv11x.pt ^
+  data=datasets/drone_mixed.yaml ^
+  split=test ^
+  device=0
