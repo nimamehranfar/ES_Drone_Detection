@@ -3,7 +3,7 @@
 # - No Jupyter widgets
 # - Single detailed CSV output (append-only)
 # - No JSON output
-# - Guided ROI / Post-processing / Continuity / Metrics preserved
+# - Temporal ROI Propagation / Post-processing / Continuity / Metrics preserved
 
 import os
 import time
@@ -31,11 +31,11 @@ ANNOTATION_PATH_PRIMARY  = r"S:\IntelliJ\Projects\ES_Drone_Detection\video_test\
 ANNOTATION_PATH_FALLBACK = r"/mnt/data/gopro_006.txt"
 ANNOTATION_PATH = ANNOTATION_PATH_PRIMARY if os.path.exists(ANNOTATION_PATH_PRIMARY) else ANNOTATION_PATH_FALLBACK
 
-OUTPUT_ROOT = "video_benchmark_outputs"
+OUTPUT_ROOT = "demo_outputs"
 
 # --- Inference Policy ---
 INFER_FPS = 5                     # Target YOLO inference calls per second (stride-based)
-ROI_SIZE = 640                    # Square crop size for Guided ROI + Verification ROI
+ROI_SIZE = 640                    # Square crop size for Temporal ROI Propagation + Cascaded ROI Confirmation ROI
 BASE_IMGSZ = 640
 
 # --- Detection Constraints ---
@@ -44,31 +44,31 @@ MAX_GUIDED_ROIS = 3
 MAX_ROI_DETECTIONS = 1            # For any ROI inference (guided/verify): max 1 detection
 
 # --- Confidence Thresholds (independent) ---
-BASE_CONF = 0.25                  # main YOLO conf (full-frame)
-GUIDED_ROI_CONF = 0.25            # main YOLO conf (guided ROI). Keep same as BASE_CONF for fair comparisons.
-LOW_CONF_THRESHOLD = 0.40         # triggers verification (Confirm Low/Small mode)
+DETECT_CONF = 0.25                  # main YOLO conf (full-frame)
+TROI_DETECT_CONF = 0.25            # main YOLO conf (temporal ROI propagation). Keep same as DETECT_CONF for fair comparisons.
+CASCADE_TRIGGER_CONF = 0.40         # triggers cascaded ROI confirmation (Confirm Low/Small mode)
 
-# Verification: two-step thresholding (not redundant!)
-# - VERIFY_CONF_THRESH controls which boxes YOLO even returns (speed/volume).
-# - VERIFY_REQUIRED_CONF is the acceptance rule for keeping the detection (quality).
-VERIFY_CONF_THRESH = 0.10         # YOLO conf inside verification ROI pass (keep low to avoid "no-box" failures)
-VERIFY_REQUIRED_CONF = 0.40       # required verification confidence to ACCEPT (otherwise detection is dropped)
+# Cascaded ROI Confirmation: two-step thresholding (not redundant!)
+# - CASCADE_DETECT_CONF controls which boxes YOLO even returns (speed/volume).
+# - CASCADE_ACCEPT_CONF is the acceptance rule for keeping the detection (quality).
+CASCADE_DETECT_CONF = 0.25         # YOLO conf inside cascaded ROI confirmation ROI pass (keep low to avoid "no-box" failures)
+CASCADE_ACCEPT_CONF = 0.40       # required cascaded ROI confirmation confidence to ACCEPT (otherwise detection is dropped)
 
 # --- Size / Area Thresholds (ALL are AREAS in pixels) ---
 # Global evaluation filter: if >0, ignore both GT and predictions smaller than this area.
 # Example: 10*10 = 100 means ignore anything <100px².
-MIN_EVAL_AREA = 0
+MIN_EVAL_AREA_PX2 = 0
 
-# Guided ROI eligibility (area threshold, in full-frame pixels)
-MIN_GUIDED_ROI_AREA = 15 * 15
+# Temporal ROI Propagation eligibility (area threshold, in full-frame pixels)
+MIN_TROI_SEED_AREA_PX2 = 15 * 15
 
-# Verification trigger for "Confirm Low/Small" mode:
-# if area < SMALL_VERIFY_TRIGGER_AREA OR main_conf < LOW_CONF_THRESHOLD -> verify.
-SMALL_VERIFY_TRIGGER_AREA = 25 * 25
+# Cascaded ROI Confirmation trigger for "Cascade Low/Small" mode:
+# if area < CASCADE_TRIGGER_AREA_PX2 OR main_conf < CASCADE_TRIGGER_CONF -> verify.
+CASCADE_TRIGGER_AREA_PX2 = 25 * 25
 
 # Alert decision thresholds (area-based)
-ALERT_MIN_AREA_BASE = 25 * 25                 # base alert size (no postproc)
-ALERT_MIN_AREA_VERIFIED = 15 * 15             # if postproc enabled, verified smaller drones can alert
+ALERT_MIN_AREA_PX2 = 25 * 25                 # base alert size (no postproc)
+ALERT_MIN_AREA_CASCADED_PX2 = 15 * 15             # if postproc enabled, verified smaller drones can alert
 
 # --- Warning / Alert Logic (INFERENCE-FRAME BASED) ---
 WARNING_WINDOW_FRAMES = 10
@@ -78,43 +78,49 @@ ALERT_WINDOW_FRAMES = 10
 ALERT_REQUIRE_HITS = 9
 
 # Cooldowns (seconds). After an event fires, its window resets and stays idle for this long.
-WARNING_COOLDOWN_S = 0.0
-ALERT_COOLDOWN_S = 0.0
+WARNING_COOLDOWN_S = 3.0
+ALERT_COOLDOWN_S = 3.0
 
 # --- Post-processing modes (no widgets) ---
 # Options:
 #   "None"
-#   "Confirm Low/Small"
-#   "Confirm All"
-#   "Alert-Window Verify"  (verification only when alert is about to trigger; affects alert vs warning only)
-POSTPROC_MODE = "None"
+#   "Cascade Low/Small"
+#   "Cascade All"
+#   "Alert-Window Cascade"  (cascaded ROI confirmation only when alert is about to trigger; affects alert vs warning only)
+CASCADED_ROI_CONFIRM_MODE = "Alert-Window Cascade"
 
-# Alert-window verify params (only used in "Alert-Window Verify")
-ALERT_WINDOW_VERIFY_CONF_THRESH = 0.10
-ALERT_WINDOW_VERIFY_REQUIRED_CONF = 0.40
-ALERT_WINDOW_VERIFY_AVG_CONF_REQUIRED = 0.55   # average of accepted verify confs in the window
-ALERT_WINDOW_VERIFY_MIN_ACCEPTED = 9           # how many of the window frames must verify to accept alert
+# Alert-window verify params (only used in "Alert-Window Cascade")
+ALERTWIN_CASCADE_DETECT_CONF = 0.25
+ALERTWIN_CASCADE_ACCEPT_CONF = 0.40
+ALERTWIN_CASCADE_AVGCONF_ACCEPT = 0.5   # average of accepted verify confs in the window
+ALERTWIN_CASCADE_MIN_ACCEPTS = 0           # how many of the window frames must verify to accept alert
 
 # --- Pre-processing toggle ---
-PREPROC_ENABLED = False   # Guided ROI
+TEMPORAL_ROI_PROP_ENABLED = True   # Temporal ROI Propagation
 
 # --- Overlay toggles ---
 SHOW_GT = False
-SHOW_GATE = False
-SHOW_GUIDED = True
-SHOW_VERIFY = True
+SHOW_GATE = True
+SHOW_TROI = False
+SHOW_CASCADE = False
 
-SHOW_OVERLAY_TEXT = True           # show/hide top-left log
-SHOW_PRED_SOURCE_TAGS = True       # show small source tags on prediction boxes (FULL/GROI/VER)
+TOPLEFT_LOG_MODE = "windows_big"         # "off" | "full" | "windows_big"
+SHOW_SOURCE_TAGS = False       # show small source tags on prediction boxes (FULL/GROI/VER)
 
 # --- Real-time viewing ---
 SHOW_WINDOW = True
-WINDOW_NAME = "Drone Detection Benchmark"
+PAUSE_KEY = 'p'  # press to pause/resume when SHOW_WINDOW=True
+WINDOW_NAME = "Drone Detection Demo"
 WINDOW_FIT_TO_SCREEN = True
 WINDOW_SCALE = 0.9                # fraction of screen (fit-to-window)
 
 # --- Output ---
-SAVE_VIDEO = False
+SAVE_VIDEO = True
+
+# Save alert-window frames (10 inference frames) when window reaches ALERT_REQUIRE_HITS.
+# Saves images with ONLY the detected drone box (no logs/ROIs/gates). Works for any mode.
+SAVE_ALERT_WINDOW_FRAMES = True
+ALERT_WINDOW_SAVE_SUBDIR = "saved_alert_windows"
 
 DRONE_LABEL = "drone"
 
@@ -157,7 +163,7 @@ def expand_box_from_center(b, factor, W, H):
     y2 = int(cy + nh/2)
     return (clamp(x1, 0, W), clamp(y1, 0, H), clamp(x2, 0, W), clamp(y2, 0, H))
 
-def crop_square_center(frame, cx, cy, size):
+def crop_square_around_point(frame, cx, cy, size):
     H, W = frame.shape[:2]
     half = size // 2
     x1 = clamp(int(cx - half), 0, W - 1)
@@ -178,35 +184,66 @@ def crop_square_center(frame, cx, cy, size):
     return frame[y1:y2, x1:x2], (x1, y1, x2, y2)
 
 def draw_box(img, b, color, thickness=2, label=None, anchor="tl"):
-    """Draw rectangle and a small label at a chosen corner.
+    """Draw rectangle and a label OUTSIDE the box to avoid overlap with edges.
 
     anchor:
-      - 'tl' top-left, 'tr' top-right, 'bl' bottom-left, 'br' bottom-right
+      - 'tl' top-left (label above box), 'tr' top-right (label above box)
+      - 'bl' bottom-left (label below box), 'br' bottom-right (label below box)
     """
     x1, y1, x2, y2 = map(int, b)
     cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
-    if label:
-        # crude text width estimate to keep it on-screen
-        est_w = max(8, 7 * len(label))
-        if anchor == "tr":
-            tx = max(0, x2 - est_w - 4)
-            ty = max(12, y1 + 12)
-        elif anchor == "bl":
-            tx = x1
-            ty = min(img.shape[0] - 4, y2 - 4)
-        elif anchor == "br":
-            tx = max(0, x2 - est_w - 4)
-            ty = min(img.shape[0] - 4, y2 - 4)
-        else:  # 'tl'
-            tx = x1
-            ty = max(12, y1 + 12)
-        cv2.putText(img, label, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+    if not label:
+        return
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 0.5
+    thick = 1
+    (tw, th), base = cv2.getTextSize(label, font, scale, thick)
+
+    H, W = img.shape[:2]
+    pad = 2
+
+    # Default placements (outside)
+    if anchor == "tr":
+        tx = x2 - tw - pad
+        ty = y1 - pad
+    elif anchor == "bl":
+        tx = x1 + pad
+        ty = y2 + th + pad
+    elif anchor == "br":
+        tx = x2 - tw - pad
+        ty = y2 + th + pad
+    else:  # "tl"
+        tx = x1 + pad
+        ty = y1 - pad
+
+    # Keep on-screen while staying outside if possible
+    tx = int(clamp(tx, 0, max(0, W - tw - 1)))
+
+    # If above the image, flip to below the box
+    if ty - th < 0:
+        ty = y2 + th + pad
+    # If below the image, flip to above the box
+    if ty >= H:
+        ty = y1 - pad
+    # Final clamp
+    ty = int(clamp(ty, th + 1, H - 2))
+
+    cv2.putText(img, label, (tx, ty), font, scale, color, thick, cv2.LINE_AA)
 
 def overlay_text(img, lines, x=10, y=20, line_h=20):
     for i, t in enumerate(lines):
         yy = y + i * line_h
         cv2.putText(img, t, (x, yy), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 3, cv2.LINE_AA)
         cv2.putText(img, t, (x, yy), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
+
+
+def overlay_text_big(img, lines, x=20, y=60, line_h=48, scale=1.35):
+    """Big-font overlay for TOPLEFT_LOG_MODE='windows_big'."""
+    for i, t in enumerate(lines):
+        yy = y + i * line_h
+        cv2.putText(img, t, (x, yy), cv2.FONT_HERSHEY_SIMPLEX, float(scale), (0, 0, 0), 6, cv2.LINE_AA)
+        cv2.putText(img, t, (x, yy), cv2.FONT_HERSHEY_SIMPLEX, float(scale), (255, 255, 255), 2, cv2.LINE_AA)
 
 def load_annotations(path, label_name):
     """Expected line format:
@@ -235,7 +272,7 @@ def load_annotations(path, label_name):
             gt[k] = gt[k][:3]
     return gt
 
-def nms_keep_indices(boxes, confs, iou_thresh=0.45):
+def nms_indices_iou(boxes, confs, iou_thresh=0.45):
     """Return kept indices in descending confidence order using IoU suppression."""
     if not boxes:
         return []
@@ -254,7 +291,7 @@ def nms_keep_indices(boxes, confs, iou_thresh=0.45):
         idxs = np.array([j for j in rest if int(j) not in suppressed], dtype=int)
     return keep
 
-def calculate_map50(inference_rows):
+def compute_map50_greedy_iou50(inference_rows):
     """Compute mAP@0.50 on inference frames only (greedy matching, up to 3 GT/preds per frame)."""
     all_predictions = []  # (confidence, frame_id, box_xyxy)
     total_gt = 0
@@ -336,9 +373,9 @@ def fit_size_to_screen(img_w, img_h, screen_w, screen_h, scale):
 #             CONTINUITY GATE
 # ==========================================
 
-class ContinuityGate:
+class TemporalContinuity:
     """
-    Continuity gate is ONLY for counting hit-frames inside Warning/Alert confirmation windows.
+    Temporal continuity is ONLY for counting hit-frames inside Warning/Alert confirmation windows.
     Does NOT affect detection metrics.
     """
     def __init__(self, stride: int):
@@ -387,7 +424,7 @@ def build_model():
             break
     return model, names, drone_cls_id
 
-def run_yolo_global(model, drone_cls_id, img_bgr, roi_rect, conf, max_det):
+def infer_roi_and_project_to_frame(model, drone_cls_id, img_bgr, roi_rect, conf, max_det):
     """Runs YOLO on img_bgr and maps detections back into full-frame coords using roi_rect offset."""
     rx, ry, _, _ = roi_rect
     res = model.predict(img_bgr, conf=float(conf), max_det=int(max_det), verbose=False, imgsz=int(BASE_IMGSZ))[0]
@@ -433,13 +470,13 @@ def main():
     # Unique run id (for unique output videos)
     RUN_ID = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
-    val_pre = bool(PREPROC_ENABLED)
-    val_post_mode = str(POSTPROC_MODE)
+    val_pre = bool(TEMPORAL_ROI_PROP_ENABLED)
+    val_post_mode = str(CASCADED_ROI_CONFIRM_MODE)
 
     val_show_gt = bool(SHOW_GT)
     val_show_gate = bool(SHOW_GATE)
-    val_show_guided = bool(SHOW_GUIDED)
-    val_show_verify = bool(SHOW_VERIFY)
+    val_show_guided = bool(SHOW_TROI)
+    val_show_verify = bool(SHOW_CASCADE)
 
     # Video output
     vid_out_path = None
@@ -463,11 +500,19 @@ def main():
         except Exception:
             pass
 
-    # Continuity gates for prediction-based warning/alert
-    gate_warning = ContinuityGate(stride)
-    gate_alert = ContinuityGate(stride)
+    # Temporal continuitys for prediction-based warning/alert
+    temporal_warning = TemporalContinuity(stride)
+    temporal_alert = TemporalContinuity(stride)
     win_warning = deque(maxlen=int(WARNING_WINDOW_FRAMES))
     win_alert = deque(maxlen=int(ALERT_WINDOW_FRAMES))
+
+    # Alert-window frame saving (log-only artifact)
+    alert_save_buf = deque(maxlen=int(ALERT_WINDOW_FRAMES))  # items: (frame_bgr, rep_box, frame_id)
+    last_alert_pre_state = False
+
+    # Alert-window cascade status line persistence (in VIDEO frames)
+    alertwin_cascade_status_msg = None
+    alertwin_cascade_status_ttl = 0
 
     warning_active = False
     alert_active = False
@@ -495,7 +540,7 @@ def main():
     cnt_verify_pass = 0
     cnt_verify_fail = 0
 
-    # Verification-triggered confidence tracking
+    # Cascaded ROI Confirmation-triggered confidence tracking
     conf_verify_trigger_main_all = []
     conf_verify_trigger_post_any = []
     conf_verify_pass_main = []
@@ -528,7 +573,7 @@ def main():
     last_infer_verify_stats = (0, 0, 0)  # tried, pass, fail
     last_infer_verify_details = []        # list of strings (includes rejected attempts)
 
-    # Alert-window verify bookkeeping (only for "Alert-Window Verify")
+    # Alert-window verify bookkeeping (only for "Alert-Window Cascade")
     alert_window_rep_boxes = deque(maxlen=int(ALERT_WINDOW_FRAMES))
     alert_window_rep_main_confs = deque(maxlen=int(ALERT_WINDOW_FRAMES))
     alert_window_rep_frame_ids = deque(maxlen=int(ALERT_WINDOW_FRAMES))
@@ -553,18 +598,18 @@ def main():
                 best_i = i
         return boxes[best_i] if best_i >= 0 else boxes[0]
 
-    def filter_by_min_eval_area(boxes, confs, sources, main_confs, post_confs):
-        if int(MIN_EVAL_AREA) <= 0:
+    def filter_dets_by_min_area_px2(boxes, confs, sources, main_confs, post_confs):
+        if int(MIN_EVAL_AREA_PX2) <= 0:
             return boxes, confs, sources, main_confs, post_confs
         out_b, out_c, out_s, out_mc, out_pc = [], [], [], [], []
         for b, c, s, mc, pc in zip(boxes, confs, sources, main_confs, post_confs):
-            if box_area(b) >= float(MIN_EVAL_AREA):
+            if box_area(b) >= float(MIN_EVAL_AREA_PX2):
                 out_b.append(b); out_c.append(c); out_s.append(s); out_mc.append(mc); out_pc.append(pc)
         return out_b, out_c, out_s, out_mc, out_pc
 
     # GT-based reference warning/alert
-    gt_gate_warning = ContinuityGate(stride)
-    gt_gate_alert   = ContinuityGate(stride)
+    gt_temporal_warning = TemporalContinuity(stride)
+    gt_temporal_alert   = TemporalContinuity(stride)
     gt_win_warning  = deque(maxlen=int(WARNING_WINDOW_FRAMES))
     gt_win_alert    = deque(maxlen=int(ALERT_WINDOW_FRAMES))
     gt_last_warning_state = False
@@ -586,17 +631,23 @@ def main():
         is_infer = (frame_id % stride == 0)
         vis = frame.copy()
 
+        # Persist alert-window cascade status line for a short time (no flicker)
+        if alertwin_cascade_status_ttl > 0:
+            alertwin_cascade_status_ttl -= 1
+            if alertwin_cascade_status_ttl <= 0:
+                alertwin_cascade_status_msg = None
+
         if is_infer:
             infer_t0 = time.perf_counter()
             num_infer_frames += 1
 
-            # Ground truth (0..3), filter by MIN_EVAL_AREA if enabled
+            # Ground truth (0..3), filter by MIN_EVAL_AREA_PX2 if enabled
             gt_boxes = GT_DATA.get(frame_id, [])[:3]
-            if int(MIN_EVAL_AREA) > 0:
-                gt_boxes = [b for b in gt_boxes if box_area(b) >= float(MIN_EVAL_AREA)]
+            if int(MIN_EVAL_AREA_PX2) > 0:
+                gt_boxes = [b for b in gt_boxes if box_area(b) >= float(MIN_EVAL_AREA_PX2)]
 
             # ============================
-            # Main inference (full frame OR guided ROI)
+            # Main inference (full frame OR temporal ROI propagation)
             # ============================
             final_boxes = []
             final_confs = []
@@ -609,7 +660,7 @@ def main():
             verify_details = []
 
             prev_boxes = last_infer_final_boxes[:] if last_infer_final_boxes else []
-            eligible_prev = [b for b in prev_boxes if box_area(b) >= float(MIN_GUIDED_ROI_AREA)]
+            eligible_prev = [b for b in prev_boxes if box_area(b) >= float(MIN_TROI_SEED_AREA_PX2)]
 
             used_guided = False
             if val_pre and len(eligible_prev) > 0:
@@ -617,11 +668,11 @@ def main():
                 eligible_prev_sorted = sorted(eligible_prev, key=lambda b: box_area(b), reverse=True)[:int(MAX_GUIDED_ROIS)]
                 for pb in eligible_prev_sorted:
                     cx, cy = center_of(pb)
-                    crop, roi = crop_square_center(frame, cx, cy, ROI_SIZE_LOCAL)
+                    crop, roi = crop_square_around_point(frame, cx, cy, ROI_SIZE_LOCAL)
                     guided_rois.append(roi)
-                    boxes_roi, confs_roi = run_yolo_global(
+                    boxes_roi, confs_roi = infer_roi_and_project_to_frame(
                         model, DRONE_CLASS_ID, crop, (roi[0], roi[1], roi[2], roi[3]),
-                        conf=GUIDED_ROI_CONF, max_det=MAX_ROI_DETECTIONS
+                        conf=TROI_DETECT_CONF, max_det=MAX_ROI_DETECTIONS
                     )
                     total_yolo_calls += 1
                     if boxes_roi:
@@ -629,18 +680,18 @@ def main():
                         c = float(confs_roi[0]) if confs_roi else 0.0
                         final_boxes.append(b)
                         final_confs.append(c)
-                        final_sources.append("guided")
+                        final_sources.append("troi")
                         final_main_confs.append(c)
                         final_post_confs.append(None)
                         cnt_guided += 1
                     if len(final_boxes) >= int(MAX_FULLFRAME_DETECTIONS):
                         break
 
-            # IMPORTANT (per your spec): if guided ROIs exist, do NOT also infer full-frame on that inference frame.
+            # IMPORTANT (per your spec): if temporal ROI propagations exist, do NOT also infer full-frame on that inference frame.
             if not used_guided:
-                boxes_full, confs_full = run_yolo_global(
+                boxes_full, confs_full = infer_roi_and_project_to_frame(
                     model, DRONE_CLASS_ID, frame, (0, 0, W, H),
-                    conf=BASE_CONF, max_det=MAX_FULLFRAME_DETECTIONS
+                    conf=DETECT_CONF, max_det=MAX_FULLFRAME_DETECTIONS
                 )
                 total_yolo_calls += 1
                 for b, c in zip(boxes_full, confs_full):
@@ -651,8 +702,8 @@ def main():
                     final_post_confs.append(None)
                     cnt_full += 1
 
-            # Filter by MIN_EVAL_AREA (affects everything: metrics + continuity + events)
-            final_boxes, final_confs, final_sources, final_main_confs, final_post_confs = filter_by_min_eval_area(
+            # Filter by MIN_EVAL_AREA_PX2 (affects everything: metrics + continuity + events)
+            final_boxes, final_confs, final_sources, final_main_confs, final_post_confs = filter_dets_by_min_area_px2(
                 final_boxes, final_confs, final_sources, final_main_confs, final_post_confs
             )
 
@@ -665,7 +716,7 @@ def main():
                 final_post_confs = final_post_confs[:int(MAX_FULLFRAME_DETECTIONS)]
 
             # ============================
-            # Post-processing confirmation (verification)
+            # Post-processing confirmation (cascaded ROI confirmation)
             # ============================
             verify_tried = 0
             verify_pass = 0
@@ -674,13 +725,13 @@ def main():
             def should_verify_area(b, main_conf):
                 if val_post_mode == "None":
                     return False
-                if val_post_mode == "Confirm All":
+                if val_post_mode == "Cascade All":
                     return True
-                if val_post_mode == "Alert-Window Verify":
-                    return False  # verification happens only for alert decision, not per-detection
+                if val_post_mode == "Alert-Window Cascade":
+                    return False  # cascaded ROI confirmation happens only for alert decision, not per-detection
                 # Confirm Low/Small
-                small = (box_area(b) < float(SMALL_VERIFY_TRIGGER_AREA))
-                low = (float(main_conf) < float(LOW_CONF_THRESHOLD))
+                small = (box_area(b) < float(CASCADE_TRIGGER_AREA_PX2))
+                low = (float(main_conf) < float(CASCADE_TRIGGER_CONF))
                 return bool(small or low)
 
             verified_boxes = []
@@ -694,19 +745,19 @@ def main():
                     verify_tried += 1
                     conf_verify_trigger_main_all.append(float(c))
                     cx, cy = center_of(b)
-                    crop, roi = crop_square_center(frame, cx, cy, ROI_SIZE_LOCAL)
+                    crop, roi = crop_square_around_point(frame, cx, cy, ROI_SIZE_LOCAL)
                     verify_rois.append(roi)
 
-                    boxes_v, confs_v = run_yolo_global(
+                    boxes_v, confs_v = infer_roi_and_project_to_frame(
                         model, DRONE_CLASS_ID, crop, (roi[0], roi[1], roi[2], roi[3]),
-                        conf=VERIFY_CONF_THRESH, max_det=MAX_ROI_DETECTIONS
+                        conf=CASCADE_DETECT_CONF, max_det=MAX_ROI_DETECTIONS
                     )
                     total_yolo_calls += 1
 
                     if boxes_v:
                         post_conf = float(confs_v[0]) if confs_v else 0.0
                         conf_verify_trigger_post_any.append(post_conf)
-                        if post_conf >= float(VERIFY_REQUIRED_CONF):
+                        if post_conf >= float(CASCADE_ACCEPT_CONF):
                             verify_pass += 1
                             cnt_verify_pass += 1
                             conf_verify_pass_main.append(float(c))
@@ -716,7 +767,7 @@ def main():
                             vc = post_conf
                             verified_boxes.append(vb)
                             verified_confs.append(vc)
-                            verified_sources.append("verify")
+                            verified_sources.append("cascade")
                             verified_main_confs.append(float(c))
                             verified_post_confs.append(post_conf)
                             verify_details.append(f"P{idx}: {c:.2f}->{post_conf:.2f} ACCEPT")
@@ -740,13 +791,13 @@ def main():
                     verified_main_confs.append(float(main_c))
                     verified_post_confs.append(None)
 
-            # Filter by MIN_EVAL_AREA again (verification could shrink boxes)
-            verified_boxes, verified_confs, verified_sources, verified_main_confs, verified_post_confs = filter_by_min_eval_area(
+            # Filter by MIN_EVAL_AREA_PX2 again (cascaded ROI confirmation could shrink boxes)
+            verified_boxes, verified_confs, verified_sources, verified_main_confs, verified_post_confs = filter_dets_by_min_area_px2(
                 verified_boxes, verified_confs, verified_sources, verified_main_confs, verified_post_confs
             )
 
             # NMS across final set
-            keep_idx = nms_keep_indices(verified_boxes, verified_confs, iou_thresh=0.45)
+            keep_idx = nms_indices_iou(verified_boxes, verified_confs, iou_thresh=0.45)
             verified_boxes = [verified_boxes[i] for i in keep_idx]
             verified_confs = [verified_confs[i] for i in keep_idx]
             verified_sources = [verified_sources[i] for i in keep_idx]
@@ -761,7 +812,7 @@ def main():
                 verified_post_confs = verified_post_confs[:int(MAX_FULLFRAME_DETECTIONS)]
 
             # ============================
-            # Continuity gate + Warning/Alert counting (prediction-based)
+            # Temporal continuity + Warning/Alert counting (prediction-based)
             # ============================
             rep_box = pick_best_match_box(
                 verified_boxes,
@@ -771,6 +822,10 @@ def main():
             if rep_box is not None:
                 # best effort: use first box's main conf (aligned by order after NMS)
                 rep_main_conf = float(verified_main_confs[0]) if verified_main_confs else None
+
+            # Buffer inference frames for optional alert-window saving
+            if bool(SAVE_ALERT_WINDOW_FRAMES) and alert_cooldown_left <= 0:
+                alert_save_buf.append((frame.copy(), rep_box, int(frame_id)))
 
             warn_hit = False
             alert_hit = False
@@ -784,13 +839,13 @@ def main():
             # Cooldown handling: during cooldown we do not accumulate windows at all
             if warn_cooldown_left > 0:
                 warn_cooldown_left -= 1
-                gate_warning.reset()
+                temporal_warning.reset()
                 win_warning.clear()
                 warning_active = False
                 warn_acc = None
             if alert_cooldown_left > 0:
                 alert_cooldown_left -= 1
-                gate_alert.reset()
+                temporal_alert.reset()
                 win_alert.clear()
                 alert_active = False
                 alert_acc = None
@@ -801,8 +856,8 @@ def main():
                 alert_window_rep_frames.clear()
 
             if rep_box is None:
-                gate_warning.reset()
-                gate_alert.reset()
+                temporal_warning.reset()
+                temporal_alert.reset()
                 win_warning.clear()
                 win_alert.clear()
                 alert_window_rep_boxes.clear()
@@ -813,7 +868,7 @@ def main():
                 alert_hit = False
             else:
                 # Warning: any size, continuity-gated
-                ok_w, curr_w, prev_w, _ = gate_warning.accept(rep_box, W, H)
+                ok_w, curr_w, prev_w, _ = temporal_warning.accept(rep_box, W, H)
                 warn_acc = bool(ok_w)
                 warn_gate_curr = curr_w
                 warn_gate_prev = prev_w
@@ -821,23 +876,23 @@ def main():
 
                 # Alert: size rule (area-based)
                 det_area = box_area(rep_box)
-                any_verified_present = ("verify" in verified_sources)
+                any_verified_present = ("cascade" in verified_sources)
 
-                if val_post_mode == "None":
-                    size_ok = (det_area >= float(ALERT_MIN_AREA_BASE))
+                if val_post_mode in ("None", "Alert-Window Cascade"):
+                    size_ok = (det_area >= float(ALERT_MIN_AREA_PX2))
                 else:
-                    size_ok = (det_area >= float(ALERT_MIN_AREA_BASE)) or (
-                        det_area >= float(ALERT_MIN_AREA_VERIFIED) and any_verified_present
+                    size_ok = (det_area >= float(ALERT_MIN_AREA_PX2)) or (
+                        det_area >= float(ALERT_MIN_AREA_CASCADED_PX2) and any_verified_present
                     )
 
                 if size_ok and alert_cooldown_left <= 0:
-                    ok_a, curr_a, prev_a, _ = gate_alert.accept(rep_box, W, H)
+                    ok_a, curr_a, prev_a, _ = temporal_alert.accept(rep_box, W, H)
                     alert_acc = bool(ok_a)
                     alert_gate_curr = curr_a
                     alert_gate_prev = prev_a
                     alert_hit = bool(ok_a)
                 else:
-                    gate_alert.reset()
+                    temporal_alert.reset()
                     win_alert.clear()
                     alert_window_rep_boxes.clear()
                     alert_window_rep_main_confs.clear()
@@ -854,11 +909,25 @@ def main():
             warning_active = (len(win_warning) == int(WARNING_WINDOW_FRAMES) and sum(win_warning) >= int(WARNING_REQUIRE_HITS)) if warn_cooldown_left <= 0 else False
             alert_active_pre = (len(win_alert) == int(ALERT_WINDOW_FRAMES) and sum(win_alert) >= int(ALERT_REQUIRE_HITS)) if alert_cooldown_left <= 0 else False
 
-            # Alert-window verify mode: convert pre-alert into alert or warning via extra verification
+            # Save alert-window frames when the pre-alert condition is first reached
+            if bool(SAVE_ALERT_WINDOW_FRAMES) and alert_active_pre and not last_alert_pre_state:
+                base = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
+                save_dir = os.path.join(OUTPUT_ROOT, ALERT_WINDOW_SAVE_SUBDIR, f"{base}_{RUN_ID}")
+                os.makedirs(save_dir, exist_ok=True)
+                # Save exactly the current buffered window (up to ALERT_WINDOW_FRAMES inference frames)
+                for (frm_bgr, box_rep, fid_rep) in list(alert_save_buf)[-int(ALERT_WINDOW_FRAMES):]:
+                    out_img = frm_bgr.copy()
+                    if box_rep is not None:
+                        draw_box(out_img, box_rep, (0, 255, 0), 2, label=None, anchor="tl")
+                    cv2.imwrite(os.path.join(save_dir, f"frame_{int(fid_rep):06d}.jpg"), out_img)
+
+            last_alert_pre_state = bool(alert_active_pre)
+
+            # Alert-window verify mode: convert pre-alert into alert or warning via extra cascaded ROI confirmation
             alert_active = False
             alert_window_verify_avg_conf_last = None
-            if val_post_mode == "Alert-Window Verify":
-                # maintain a window buffer of representative boxes for potential verification
+            if val_post_mode == "Alert-Window Cascade":
+                # maintain a window buffer of representative boxes for potential cascaded ROI confirmation
                 if rep_box is not None and alert_cooldown_left <= 0:
                     alert_window_rep_boxes.append(rep_box)
                     alert_window_rep_main_confs.append(float(rep_main_conf) if rep_main_conf is not None else 0.0)
@@ -867,7 +936,7 @@ def main():
 
                 if alert_active_pre:
                     alert_window_verify_triggers += 1
-                    # run verification on the buffered window boxes (ROI around each rep box)
+                    # run cascaded ROI confirmation on the buffered window boxes (ROI around each rep box)
                     accepted_confs = []
                     verify_attempts_here = 0
                     verify_accepts_here = 0
@@ -876,17 +945,17 @@ def main():
                     t_verify0 = time.perf_counter()
                     for frm_win, b_win in zip(list(alert_window_rep_frames), list(alert_window_rep_boxes)):
                         cx, cy = center_of(b_win)
-                        crop, roi = crop_square_center(frm_win, cx, cy, ROI_SIZE_LOCAL)
+                        crop, roi = crop_square_around_point(frm_win, cx, cy, ROI_SIZE_LOCAL)
                         verify_rois.append(roi)
-                        boxes_v, confs_v = run_yolo_global(
+                        boxes_v, confs_v = infer_roi_and_project_to_frame(
                             model, DRONE_CLASS_ID, crop, (roi[0], roi[1], roi[2], roi[3]),
-                            conf=ALERT_WINDOW_VERIFY_CONF_THRESH, max_det=MAX_ROI_DETECTIONS
+                            conf=ALERTWIN_CASCADE_DETECT_CONF, max_det=MAX_ROI_DETECTIONS
                         )
                         total_yolo_calls += 1
                         verify_attempts_here += 1
                         if boxes_v:
                             post_conf = float(confs_v[0]) if confs_v else 0.0
-                            if post_conf >= float(ALERT_WINDOW_VERIFY_REQUIRED_CONF):
+                            if post_conf >= float(ALERTWIN_CASCADE_ACCEPT_CONF):
                                 accepted_confs.append(post_conf)
                                 verify_accepts_here += 1
                             else:
@@ -906,12 +975,23 @@ def main():
                         alert_window_verify_avg_conf_last = 0.0
 
                     # Decide alert vs warning
-                    if (verify_accepts_here >= int(ALERT_WINDOW_VERIFY_MIN_ACCEPTED)) and (alert_window_verify_avg_conf_last >= float(ALERT_WINDOW_VERIFY_AVG_CONF_REQUIRED)):
+                    if (verify_accepts_here >= int(ALERTWIN_CASCADE_MIN_ACCEPTS)) and (alert_window_verify_avg_conf_last >= float(ALERTWIN_CASCADE_AVGCONF_ACCEPT)):
                         alert_active = True
                     else:
                         # convert to warning event (your request)
                         alert_active = False
                         warning_active = True
+
+                    # Persist a status line on the video log until the cascaded check + cooldown period elapses
+                    verdict = "ALERT" if alert_active else "WARNING"
+                    alertwin_cascade_status_msg = (
+                        f"AlertWinCascade: pass={verify_accepts_here}/{int(ALERT_WINDOW_FRAMES)} "
+                        f"avg={float(alert_window_verify_avg_conf_last):.2f} "
+                        f"need>={float(ALERTWIN_CASCADE_AVGCONF_ACCEPT):.2f} "
+                        f"minpass>={int(ALERTWIN_CASCADE_MIN_ACCEPTS)} => {verdict}"
+                    )
+                    # TTL in VIDEO frames: cooldown seconds after the check finishes
+                    alertwin_cascade_status_ttl = max(alertwin_cascade_status_ttl, int(round(float(ALERT_COOLDOWN_S) * float(fps))))
 
                     # reset after event decision + start cooldown
                     if alert_active and not last_alert_state:
@@ -921,7 +1001,7 @@ def main():
                         count_warning_events += 1
                         warn_cooldown_left = max(warn_cooldown_left, int(round(float(WARNING_COOLDOWN_S) * float(INFER_FPS))))
 
-                    gate_alert.reset()
+                    temporal_alert.reset()
                     win_alert.clear()
                     alert_window_rep_boxes.clear()
                     alert_window_rep_main_confs.clear()
@@ -935,13 +1015,13 @@ def main():
                     count_warning_events += 1
                     if warn_cooldown_frames > 0:
                         warn_cooldown_left = warn_cooldown_frames
-                        gate_warning.reset()
+                        temporal_warning.reset()
                         win_warning.clear()
                 if alert_active and not last_alert_state:
                     count_alert_events += 1
                     if alert_cooldown_frames > 0:
                         alert_cooldown_left = alert_cooldown_frames
-                        gate_alert.reset()
+                        temporal_alert.reset()
                         win_alert.clear()
 
             last_warning_state = bool(warning_active)
@@ -956,34 +1036,34 @@ def main():
 
             if gt_warn_cooldown_left > 0:
                 gt_warn_cooldown_left -= 1
-                gt_gate_warning.reset()
+                gt_temporal_warning.reset()
                 gt_win_warning.clear()
             if gt_alert_cooldown_left > 0:
                 gt_alert_cooldown_left -= 1
-                gt_gate_alert.reset()
+                gt_temporal_alert.reset()
                 gt_win_alert.clear()
 
             if gt_rep_box is None:
-                gt_gate_warning.reset()
-                gt_gate_alert.reset()
+                gt_temporal_warning.reset()
+                gt_temporal_alert.reset()
                 gt_win_warning.clear()
                 gt_win_alert.clear()
                 gt_warn_hit = False
                 gt_alert_hit = False
             else:
-                ok_gw, _, _, _ = gt_gate_warning.accept(gt_rep_box, W, H)
+                ok_gw, _, _, _ = gt_temporal_warning.accept(gt_rep_box, W, H)
                 gt_warn_hit = bool(ok_gw)
 
                 gt_area = box_area(gt_rep_box)
                 if val_post_mode == "None":
-                    size_ok_gt = (gt_area >= float(ALERT_MIN_AREA_BASE))
+                    size_ok_gt = (gt_area >= float(ALERT_MIN_AREA_PX2))
                 else:
-                    size_ok_gt = (gt_area >= float(ALERT_MIN_AREA_BASE)) or (gt_area >= float(ALERT_MIN_AREA_VERIFIED))
+                    size_ok_gt = (gt_area >= float(ALERT_MIN_AREA_PX2)) or (gt_area >= float(ALERT_MIN_AREA_CASCADED_PX2))
                 if size_ok_gt:
-                    ok_ga, _, _, _ = gt_gate_alert.accept(gt_rep_box, W, H)
+                    ok_ga, _, _, _ = gt_temporal_alert.accept(gt_rep_box, W, H)
                     gt_alert_hit = bool(ok_ga)
                 else:
-                    gt_gate_alert.reset()
+                    gt_temporal_alert.reset()
                     gt_win_alert.clear()
                     gt_alert_hit = False
 
@@ -999,13 +1079,13 @@ def main():
                 gt_count_warning_events += 1
                 if warn_cooldown_frames > 0:
                     gt_warn_cooldown_left = warn_cooldown_frames
-                    gt_gate_warning.reset()
+                    gt_temporal_warning.reset()
                     gt_win_warning.clear()
             if gt_alert_active and not gt_last_alert_state:
                 gt_count_alert_events += 1
                 if alert_cooldown_frames > 0:
                     gt_alert_cooldown_left = alert_cooldown_frames
-                    gt_gate_alert.reset()
+                    gt_temporal_alert.reset()
                     gt_win_alert.clear()
 
             gt_last_warning_state = bool(gt_warning_active)
@@ -1030,7 +1110,7 @@ def main():
             else:
                 alert_state_tn += 1
 
-            # Record inference row for metrics (FINAL detections only, after verification filtering)
+            # Record inference row for metrics (FINAL detections only, after cascaded ROI confirmation filtering)
             inference_rows.append({
                 "frame_id": int(frame_id),
                 "gt_boxes": list(gt_boxes),
@@ -1073,7 +1153,7 @@ def main():
 
         if val_show_gt:
             for i, gb in enumerate(GT_DATA.get(frame_id, [])[:3]):
-                if int(MIN_EVAL_AREA) > 0 and box_area(gb) < float(MIN_EVAL_AREA):
+                if int(MIN_EVAL_AREA_PX2) > 0 and box_area(gb) < float(MIN_EVAL_AREA_PX2):
                     continue
                 draw_box(vis, gb, (255, 255, 0), 2, label=f"GT{i+1}", anchor="tr")
 
@@ -1083,87 +1163,117 @@ def main():
             if src == "full":
                 col = (0, 255, 0)
                 tag = "FULL"
-            elif src == "guided":
+            elif src == "troi":
                 col = (255, 0, 255)
-                tag = "GROI"
+                tag = "TROI"
             else:
                 col = (0, 165, 255)
-                tag = "VER"
-            label = f"P{i+1}-{tag}" if SHOW_PRED_SOURCE_TAGS else None
+                tag = "CROI"
+            label = f"P{i+1}-{tag}" if SHOW_SOURCE_TAGS else None
             # alternate corners to avoid overlap
             anchors = ["tl", "tr", "bl"]
-            draw_box(vis, pb, col, 2, label=label, anchor=anchors[i % len(anchors)])
+            draw_box(vis, pb, col, 1, label=label, anchor=anchors[i % len(anchors)])
 
-        # Guided ROIs
+        # Temporal ROI Propagations
         if val_show_guided:
             for roi in last_infer_guided_rois[:int(MAX_GUIDED_ROIS)]:
-                draw_box(vis, roi, (255, 0, 255), 1, label="GuidedROI", anchor="bl")
+                draw_box(vis, roi, (255, 0, 255), 1, label="TemporalROI", anchor="bl")
 
-        # Verify ROIs
-        if val_show_verify:
-            for roi in last_infer_verify_rois[:int(MAX_GUIDED_ROIS)]:
-                draw_box(vis, roi, (0, 165, 255), 1, label="VerifyROI", anchor="br")
+        # Cascaded ROI Confirmation ROIs are log-only (do NOT draw boxes on video)
+        # (verification passes are not part of the video frame stream)
 
         # Gates (prev/current)
         if val_show_gate:
-            if last_infer_gate_prev_warn is not None:
-                draw_box(vis, last_infer_gate_prev_warn, (200, 200, 200), 1, label="WarnGatePrev", anchor="tl")
-            if last_infer_gate_curr_warn is not None:
-                draw_box(vis, last_infer_gate_curr_warn, (255, 255, 255), 1, label="WarnGateCurr", anchor="tr")
+            # if last_infer_gate_prev_warn is not None:
+            #     draw_box(vis, last_infer_gate_prev_warn, (200, 200, 200), 1, label="WarnTCPrev", anchor="tl")
+            # if last_infer_gate_curr_warn is not None:
+            #     draw_box(vis, last_infer_gate_curr_warn, (255, 255, 255), 1, label="WarnTCCurr", anchor="tr")
             if last_infer_gate_prev_alert is not None:
-                draw_box(vis, last_infer_gate_prev_alert, (120, 120, 120), 1, label="AlertGatePrev", anchor="bl")
+                draw_box(vis, last_infer_gate_prev_alert, (0, 183, 235), 1, label="TCPrev", anchor="bl")
             if last_infer_gate_curr_alert is not None:
-                draw_box(vis, last_infer_gate_curr_alert, (180, 180, 180), 1, label="AlertGateCurr", anchor="br")
+                draw_box(vis, last_infer_gate_curr_alert, (0, 255, 255), 1, label="TCCurr", anchor="br")
 
         # Top-left log
-        if SHOW_OVERLAY_TEXT:
-            det_lines = []
-            for i in range(min(3, len(last_infer_final_boxes))):
-                b = last_infer_final_boxes[i]
-                area = int(round(box_area(b)))
-                src = last_infer_final_sources[i] if i < len(last_infer_final_sources) else "?"
-                main_c = float(last_infer_final_main_confs[i]) if i < len(last_infer_final_main_confs) else float(last_infer_final_confs[i])
-                post_c = last_infer_final_post_confs[i] if i < len(last_infer_final_post_confs) else None
-                if src == "verify" and post_c is not None:
-                    det_lines.append(f"Pred{i+1}: area={area} src=VER conf {main_c:.2f}->{float(post_c):.2f}")
-                else:
-                    det_lines.append(f"Pred{i+1}: area={area} src={src.upper()} conf {main_c:.2f}")
+        if TOPLEFT_LOG_MODE != "off":
+            if TOPLEFT_LOG_MODE == "windows_big":
+                lines = [
+                    f"WARNING hits {sum(win_warning)}/{len(win_warning)}  need {WARNING_REQUIRE_HITS}/{WARNING_WINDOW_FRAMES}  events={count_warning_events}",
+                    f"ALERT   hits {sum(win_alert)}/{len(win_alert)}  need {ALERT_REQUIRE_HITS}/{ALERT_WINDOW_FRAMES}  events={count_alert_events}",
+                ]
+                if alertwin_cascade_status_msg:
+                    lines.append(str(alertwin_cascade_status_msg))
+                overlay_text_big(vis, lines)
+            else:
+                det_lines = []
+                for i in range(min(3, len(last_infer_final_boxes))):
+                    b = last_infer_final_boxes[i]
+                    area = int(round(box_area(b)))
+                    src = last_infer_final_sources[i] if i < len(last_infer_final_sources) else "?"
+                    main_c = float(last_infer_final_main_confs[i]) if i < len(last_infer_final_main_confs) else float(last_infer_final_confs[i])
+                    post_c = last_infer_final_post_confs[i] if i < len(last_infer_final_post_confs) else None
+                    if src == "cascade" and post_c is not None:
+                        det_lines.append(f"Pred{i+1}: area={area} src=VER conf {main_c:.2f}->{float(post_c):.2f}")
+                    else:
+                        det_lines.append(f"Pred{i+1}: area={area} src={src.upper()} conf {main_c:.2f}")
 
-            det_line = " | ".join(det_lines) if det_lines else "Pred: none"
+                det_line = " | ".join(det_lines) if det_lines else "Pred: none"
 
-            vt, vp, vf = last_infer_verify_stats
-            ver_line = f"Verify: mode={POSTPROC_MODE} tried={vt} pass={vp} fail={vf}"
-            if last_infer_verify_details:
-                # show last 3 attempt details so rejected attempts are visible
-                ver_line += " | " + " ; ".join(last_infer_verify_details[-3:])
+                vt, vp, vf = last_infer_verify_stats
+                ver_line = f"Cascade: mode={CASCADED_ROI_CONFIRM_MODE} tried={vt} pass={vp} fail={vf}"
+                if last_infer_verify_details:
+                    # show last 3 attempt details so rejected attempts are visible
+                    ver_line += " | " + " ; ".join(last_infer_verify_details[-3:])
 
-            warn_gate_txt = "-" if last_infer_gate_warn_accepted is None else ("OK" if last_infer_gate_warn_accepted else "NO")
-            alert_gate_txt = "-" if last_infer_gate_alert_accepted is None else ("OK" if last_infer_gate_alert_accepted else "NO")
+                warn_gate_txt = "-" if last_infer_gate_warn_accepted is None else ("OK" if last_infer_gate_warn_accepted else "NO")
+                alert_gate_txt = "-" if last_infer_gate_alert_accepted is None else ("OK" if last_infer_gate_alert_accepted else "NO")
 
-            lines = [
-                f"Frame {frame_id} ({'INFER' if (frame_id % stride == 0) else 'HOLD'})  GT={len(GT_DATA.get(frame_id, []))}  Pred={len(last_infer_final_boxes)}  UsedGROI={'YES' if (len(last_infer_guided_rois)>0) else 'NO'}",
-                det_line,
-                ver_line,
-                f"Continuity: Warn={warn_gate_txt}  Alert={alert_gate_txt}",
-                f"Windows: Warn hits {sum(win_warning)}/{len(win_warning)} (need {WARNING_REQUIRE_HITS}/{WARNING_WINDOW_FRAMES}) cd={warn_cooldown_left}  |  Alert hits {sum(win_alert)}/{len(win_alert)} (need {ALERT_REQUIRE_HITS}/{ALERT_WINDOW_FRAMES}) cd={alert_cooldown_left}",
-                f"State: Warn pred/GT={int(last_infer_warn_state)}/{int(last_infer_gt_warn_state)}  Alert pred/GT={int(last_infer_alert_state)}/{int(last_infer_gt_alert_state)}  Events Warn={count_warning_events}  Alert={count_alert_events}",
-            ]
-            overlay_text(vis, lines)
+                lines = [
+                    f"Frame {frame_id} ({'INFER' if (frame_id % stride == 0) else 'HOLD'})  Pred={len(last_infer_final_boxes)}  UsedGROI={'YES' if (len(last_infer_guided_rois)>0) else 'NO'}",
+                    det_line,
+                    ver_line,
+                    f"Temporal Continuity: Warn={warn_gate_txt}  Alert={alert_gate_txt}",
+                    f"Windows: Warn hits {sum(win_warning)}/{len(win_warning)} (need {WARNING_REQUIRE_HITS}/{WARNING_WINDOW_FRAMES})  |  Alert hits {sum(win_alert)}/{len(win_alert)} (need {ALERT_REQUIRE_HITS}/{ALERT_WINDOW_FRAMES})",
+                    f"Events: Warning={count_warning_events}  Alert={count_alert_events}",
+                ]
+                if alertwin_cascade_status_msg:
+                    lines.append(str(alertwin_cascade_status_msg))
+                overlay_text(vis, lines)
 
         # Save video
         if writer is not None:
             writer.write(vis)
 
-        # Real-time display
+        # Real-time display (pause with PAUSE_KEY)
         if SHOW_WINDOW:
             show_img = vis
             if screen is not None:
                 # ensure the full frame is visible by resizing to fitted display size
                 show_img = cv2.resize(vis, (disp_w, disp_h), interpolation=cv2.INTER_AREA)
+
             cv2.imshow(WINDOW_NAME, show_img)
             k = cv2.waitKey(1) & 0xFF
+
+            # Quit
             if k in (27, ord('q')):  # ESC or q
                 break
+
+            # Pause/resume (toggle)
+            if k == ord(str(PAUSE_KEY).lower()):
+                while True:
+                    # keep showing the same frame while paused (window stays resizable)
+                    cv2.imshow(WINDOW_NAME, show_img)
+                    kk = cv2.waitKey(30) & 0xFF
+                    if kk in (27, ord('q')):
+                        ret = False  # force exit outer loop
+                        break
+                    if kk == ord(str(PAUSE_KEY).lower()):
+                        break
+                    if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
+                        ret = False
+                        break
+                if not ret:
+                    break
+
             # if window is closed by user
             if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_VISIBLE) < 1:
                 break
@@ -1184,7 +1294,7 @@ def main():
     #            METRICS + SINGLE CSV
     # ==========================================
 
-    mAP = calculate_map50(inference_rows)
+    mAP = compute_map50_greedy_iou50(inference_rows)
 
     tp_total = fp_total = fn_total = 0
     tp_confs = []
@@ -1215,14 +1325,14 @@ def main():
                 matched_gt.add(best_idx)
                 tp_confs.append(float(pc))
                 if ps == "full": tp_confs_full.append(float(pc))
-                elif ps == "guided": tp_confs_guided.append(float(pc))
-                elif ps == "verify": tp_confs_verify.append(float(pc))
+                elif ps == "troi": tp_confs_guided.append(float(pc))
+                elif ps == "cascade": tp_confs_verify.append(float(pc))
             else:
                 fp_total += 1
                 fp_confs.append(float(pc))
                 if ps == "full": fp_confs_full.append(float(pc))
-                elif ps == "guided": fp_confs_guided.append(float(pc))
-                elif ps == "verify": fp_confs_verify.append(float(pc))
+                elif ps == "troi": fp_confs_guided.append(float(pc))
+                elif ps == "cascade": fp_confs_verify.append(float(pc))
 
         fn_total += (len(gts) - len(matched_gt))
 
@@ -1246,8 +1356,8 @@ def main():
 
     all_pred_confs = [float(pc) for row in inference_rows for pc in row.get("pred_confs", [])]
     all_full_confs = [float(pc) for row in inference_rows for pc, ps in zip(row.get("pred_confs", []), row.get("pred_sources", [])) if ps == "full"]
-    all_guided_confs = [float(pc) for row in inference_rows for pc, ps in zip(row.get("pred_confs", []), row.get("pred_sources", [])) if ps == "guided"]
-    all_verify_confs = [float(pc) for row in inference_rows for pc, ps in zip(row.get("pred_confs", []), row.get("pred_sources", [])) if ps == "verify"]
+    all_guided_confs = [float(pc) for row in inference_rows for pc, ps in zip(row.get("pred_confs", []), row.get("pred_sources", [])) if ps == "troi"]
+    all_verify_confs = [float(pc) for row in inference_rows for pc, ps in zip(row.get("pred_confs", []), row.get("pred_sources", [])) if ps == "cascade"]
 
     avg_infer_ms = (total_infer_time_s / num_infer_frames * 1000.0) if num_infer_frames else 0.0
     effective_infer_fps = (num_infer_frames / total_infer_time_s) if total_infer_time_s else 0.0
@@ -1257,18 +1367,18 @@ def main():
     # We do NOT add new columns here; instead, we pack new config into run_id for traceability.
     run_id_tagged = (
         f"{RUN_ID}"
-        f"|minEvalA={int(MIN_EVAL_AREA)}"
+        f"|minEvalA={int(MIN_EVAL_AREA_PX2)}"
         f"|Wwin={int(WARNING_WINDOW_FRAMES)}:{int(WARNING_REQUIRE_HITS)}"
         f"|Awin={int(ALERT_WINDOW_FRAMES)}:{int(ALERT_REQUIRE_HITS)}"
         f"|Wcd={float(WARNING_COOLDOWN_S):.2f}"
         f"|Acd={float(ALERT_COOLDOWN_S):.2f}"
     )
-    if val_post_mode == "Alert-Window Verify":
+    if val_post_mode == "Alert-Window Cascade":
         run_id_tagged += (
-            f"|AWVconf={float(ALERT_WINDOW_VERIFY_CONF_THRESH):.2f}"
-            f"|AWVreq={float(ALERT_WINDOW_VERIFY_REQUIRED_CONF):.2f}"
-            f"|AWVavg={float(ALERT_WINDOW_VERIFY_AVG_CONF_REQUIRED):.2f}"
-            f"|AWVmin={int(ALERT_WINDOW_VERIFY_MIN_ACCEPTED)}"
+            f"|AWVconf={float(ALERTWIN_CASCADE_DETECT_CONF):.2f}"
+            f"|AWVreq={float(ALERTWIN_CASCADE_ACCEPT_CONF):.2f}"
+            f"|AWVavg={float(ALERTWIN_CASCADE_AVGCONF_ACCEPT):.2f}"
+            f"|AWVmin={int(ALERTWIN_CASCADE_MIN_ACCEPTS)}"
         )
 
     detail = {
@@ -1283,14 +1393,14 @@ def main():
         "roi_size": int(ROI_SIZE_LOCAL),
 
         "preproc_enabled": bool(val_pre),
-        "guided_roi_min_area": int(MIN_GUIDED_ROI_AREA),
+        "guided_roi_min_area": int(MIN_TROI_SEED_AREA_PX2),
         "postproc_mode": str(val_post_mode),
 
-        "base_conf": float(BASE_CONF),
-        "guided_conf": float(GUIDED_ROI_CONF),
-        "low_conf_threshold": float(LOW_CONF_THRESHOLD),
-        "verify_conf": float(VERIFY_CONF_THRESH),
-        "verify_required_conf": float(VERIFY_REQUIRED_CONF),
+        "base_conf": float(DETECT_CONF),
+        "guided_conf": float(TROI_DETECT_CONF),
+        "low_conf_threshold": float(CASCADE_TRIGGER_CONF),
+        "verify_conf": float(CASCADE_DETECT_CONF),
+        "verify_required_conf": float(CASCADE_ACCEPT_CONF),
 
         "precision": float(prec),
         "recall": float(rec),
@@ -1327,7 +1437,7 @@ def main():
         "avg_conf_guided_preds": safe_mean(all_guided_confs),
         "avg_conf_verify_preds": safe_mean(all_verify_confs),
 
-        # Reuse existing verification columns:
+        # Reuse existing cascaded ROI confirmation columns:
         "verify_attempts_total": int(len(conf_verify_trigger_main_all)),
         "verify_pass_total": int(cnt_verify_pass),
         "verify_fail_total": int(cnt_verify_fail),
