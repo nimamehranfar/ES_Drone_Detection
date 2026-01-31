@@ -1,7 +1,0 @@
-our yolov26n: 0.978      0.915      0.951 : Speed: 0.7ms preprocess, 1.4ms inference, 0.0ms loss, 0.1ms postprocess per image
-
-MohiteYash__Drone_yolo_v11.pt: 0.491      0.334      0.318 : Speed: 0.7ms preprocess, 1.4ms inference, 0.0ms loss, 0.8ms postprocess per image
-
-doguilmak__Drone-Detection-YOLOv11x:   0.396      0.235      0.215 : Speed: 0.8ms preprocess, 27.8ms inference, 0.0ms loss, 0.7ms postprocess per image
-
-FardadDadboud__Drone_YOLOv5_Detector:  0.924      0.554      0.753 : Speed: 0.2ms pre-process, 23.3ms inference, 0.5ms NMS per image at shape (32, 3, 640, 640)

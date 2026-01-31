@@ -29,17 +29,9 @@ dist/
 
 # --- YOLOv11 / Ultralytics Training ---
 # Ignore training results and pretrained_weights
-runs/detect/*
-
-# 2. Allow the yolo11 folder
-!runs/detect/yolo11/
-!runs/detect/yolo26/
-
-# 3. Allow everything INSIDE the yolo11 folder (overrides the *.pt rule below)
-!runs/yolo11/**
-!runs/yolo26/drone_finetune_full_mixed/**
-!runs/detect/yolo26/drone_finetune_full_mixed/weights/best.pt
-
+runs/
+drone_detector/pretrained_weights
+drone_detector/Yolo26n_trained/weights
 *.pt
 *.onnx
 *.engine
@@ -51,9 +43,16 @@ datasets/
 data/*.zip
 data/*.tar.gz
 *.zip
+
+drone_detector/video_test/2019_10_16_C0003_4613_mavic.*
+drone_detector/video_test/dji_mavick_distant_hillside.*
+drone_detector/video_test/gopro_006.*
+drone_detector/video_test/
 video_benchmark_outputs/
-video_test/
-yolov5/
+drone_detector/yolov5/
+benchmarks/
+backup/
+drone_detector/commands.txt
 
 # --- Logs and Cache ---
 *.log
